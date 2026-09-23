@@ -43,7 +43,9 @@ class ReservaForm(forms.ModelForm):
         inicio = cleaned.get('hora_inicio')
         fim = cleaned.get('hora_fim')
 
-        if sala and data and inicio and fim:
+        if inicio and fim and inicio >= fim:
+            self.add_error('hora_fim', 'A hora de fim deve ser depois da hora de início.')
+        elif sala and data and inicio and fim:
             conflito = reservas_em_conflito(sala, data, inicio, fim).first()
             if conflito:
                 raise forms.ValidationError(

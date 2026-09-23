@@ -215,3 +215,27 @@ class BuscaFiltroSalasTest(TestCase):
     def test_busca_permanece_no_campo(self):
         r = self.client.get(reverse('reservas:sala_lista'), {'q': 'audit'})
         self.assertContains(r, 'value="audit"')
+
+
+# --------------------------------------------------------------------------- #
+# Feature 2 do P1: validação customizada no ModelForm                         #
+# --------------------------------------------------------------------------- #
+class ValidacaoHorarioReservaTest(TestCase):
+    def setUp(self):
+        self.sala = Sala.objects.create(nome='Sala X')
+
+    def _dados(self, inicio, fim):
+        return {'sala': self.sala.id, 'titulo': 'Reunião', 'responsavel': 'Ana',
+                'data': '2026-10-01', 'hora_inicio': inicio, 'hora_fim': fim,
+                'observacoes': ''}
+
+    def test_fim_antes_do_inicio_e_rejeitado(self):
+        from .forms import ReservaForm
+        form = ReservaForm(data=self._dados('11:00', '10:00'))
+        self.assertFalse(form.is_valid())
+        self.assertIn('hora_fim', form.errors)
+
+    def test_horario_valido_passa(self):
+        from .forms import ReservaForm
+        form = ReservaForm(data=self._dados('10:00', '11:00'))
+        self.assertTrue(form.is_valid())
