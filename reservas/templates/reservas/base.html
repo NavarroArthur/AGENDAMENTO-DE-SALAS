@@ -1,0 +1,42 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block titulo %}Reserva de Salas{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'reservas/estilo.css' %}">
+</head>
+<body>
+    <header class="topo">
+        <div class="conteiner topo-inner">
+            <a class="marca" href="{% url 'reservas:reserva_lista' %}">📅 Reserva de Salas</a>
+            <nav class="menu">
+                <a href="{% url 'reservas:reserva_lista' %}">Agenda</a>
+                <a href="{% url 'reservas:sala_lista' %}">Salas</a>
+                <a href="{% url 'reservas:recurso_lista' %}">Recursos</a>
+                <a href="{% url 'reservas:reserva_nova' %}">+ Reserva</a>
+                <a class="destaque" href="{% url 'reservas:recorrencia_nova' %}">+ Recorrente</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="conteiner conteudo">
+        {% if messages %}
+            <div class="avisos">
+                {% for message in messages %}
+                    <div class="aviso aviso-{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block conteudo %}{% endblock %}
+    </main>
+
+    <footer class="rodape">
+        <div class="conteiner">
+            Laboratório de Programação Full Stack · Django puro · P1
+        </div>
+    </footer>
+</body>
+</html>

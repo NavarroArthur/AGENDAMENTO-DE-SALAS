@@ -1,0 +1,48 @@
+{% extends 'reservas/base.html' %}
+
+{% block titulo %}Salas{% endblock %}
+
+{% block conteudo %}
+<div class="cabecalho-lista">
+    <h1>Salas</h1>
+    <a class="botao" href="{% url 'reservas:sala_nova' %}">+ Nova sala</a>
+</div>
+
+<form method="get" class="filtros">
+    <label>Filtrar por recurso:
+        <select name="recurso" onchange="this.form.submit()">
+            <option value="">Todos</option>
+            {% for recurso in recursos %}
+                <option value="{{ recurso.id }}" {% if recurso.id|stringformat:"s" == recurso_id %}selected{% endif %}>{{ recurso.nome }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    {% if recurso_id %}<a href="{% url 'reservas:sala_lista' %}">limpar</a>{% endif %}
+</form>
+
+<table class="tabela">
+    <thead>
+        <tr><th>Nome</th><th>Capacidade</th><th>Localização</th><th>Recursos</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for sala in salas %}
+            <tr>
+                <td>{{ sala.nome }}</td>
+                <td>{{ sala.capacidade }}</td>
+                <td>{{ sala.localizacao|default:"—" }}</td>
+                <td>
+                    {% for recurso in sala.recursos.all %}
+                        <span class="tag">{{ recurso.nome }}</span>
+                    {% empty %}—{% endfor %}
+                </td>
+                <td class="acoes">
+                    <a href="{% url 'reservas:sala_editar' sala.pk %}">editar</a>
+                    <a class="perigo" href="{% url 'reservas:sala_excluir' sala.pk %}">excluir</a>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5" class="vazio">Nenhuma sala cadastrada.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
