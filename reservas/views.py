@@ -43,16 +43,28 @@ def recurso_excluir(request, pk):
 # Salas (CRUD)                                                                #
 # --------------------------------------------------------------------------- #
 def sala_lista(request):
+    """Listagem de salas com busca textual e filtros (Feature 1 do P1).
+
+    Busca por nome (case-insensitive) + filtro por recurso + filtro por
+    capacidade mínima. Todos são opcionais e combináveis (viram um E).
+    """
     salas = Sala.objects.prefetch_related('recursos')
-    recurso_id = request.GET.get('recurso')
+
+    q = request.GET.get('q', '').strip()
+    recurso_id = request.GET.get('recurso', '')
+    capacidade = request.GET.get('capacidade', '')
+
+    if q:
+        salas = salas.filter(nome__icontains=q)               # busca textual
     if recurso_id:
-        salas = salas.filter(recursos__id=recurso_id)
-    contexto = {
-        'salas': salas,
+        salas = salas.filter(recursos__id=recurso_id)         # filtro por recurso
+    if capacidade.isdigit():
+        salas = salas.filter(capacidade__gte=int(capacidade))  # filtro por capacidade
+
+    return render(request, 'reservas/sala_lista.html', {
+        'salas': salas.distinct(),           # distinct por causa do join M2M
         'recursos': Recurso.objects.all(),
-        'recurso_id': recurso_id,
-    }
-    return render(request, 'reservas/sala_lista.html', contexto)
+    })
 
 
 def sala_form(request, pk=None):

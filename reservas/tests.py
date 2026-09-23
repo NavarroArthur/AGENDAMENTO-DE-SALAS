@@ -171,3 +171,47 @@ class ViewRecorrenciaTest(TestCase):
         self.client.post(reverse('reservas:recorrencia_excluir', args=[serie.id]))
         self.assertEqual(Recorrencia.objects.count(), 0)
         self.assertEqual(Reserva.objects.count(), 0)
+
+
+# --------------------------------------------------------------------------- #
+# Feature 1 do P1: busca e filtro na listagem de salas                        #
+# --------------------------------------------------------------------------- #
+class BuscaFiltroSalasTest(TestCase):
+    def setUp(self):
+        self.projetor = Recurso.objects.create(nome='Projetor')
+        self.tv = Recurso.objects.create(nome='TV')
+        self.auditorio = Sala.objects.create(nome='Auditório Central', capacidade=100)
+        self.auditorio.recursos.add(self.projetor)
+        self.pequena = Sala.objects.create(nome='Sala Pequena', capacidade=10)
+        self.pequena.recursos.add(self.tv)
+
+    def test_busca_por_nome_icontains(self):
+        # 'audit' (minúsculo) deve achar 'Auditório Central' (não é case-sensitive)
+        r = self.client.get(reverse('reservas:sala_lista'), {'q': 'audit'})
+        self.assertContains(r, 'Auditório Central')
+        self.assertNotContains(r, 'Sala Pequena')
+
+    def test_filtro_por_recurso(self):
+        r = self.client.get(reverse('reservas:sala_lista'), {'recurso': self.tv.id})
+        self.assertContains(r, 'Sala Pequena')
+        self.assertNotContains(r, 'Auditório Central')
+
+    def test_filtro_por_capacidade_minima(self):
+        r = self.client.get(reverse('reservas:sala_lista'), {'capacidade': '50'})
+        self.assertContains(r, 'Auditório Central')
+        self.assertNotContains(r, 'Sala Pequena')
+
+    def test_busca_e_filtro_combinados(self):
+        # nome contém 'sala' E tem o recurso TV -> só a Sala Pequena
+        r = self.client.get(reverse('reservas:sala_lista'),
+                            {'q': 'sala', 'recurso': self.tv.id})
+        self.assertContains(r, 'Sala Pequena')
+        self.assertNotContains(r, 'Auditório Central')
+
+    def test_sem_resultado_mostra_mensagem(self):
+        r = self.client.get(reverse('reservas:sala_lista'), {'q': 'inexistente'})
+        self.assertContains(r, 'Nenhuma sala encontrada')
+
+    def test_busca_permanece_no_campo(self):
+        r = self.client.get(reverse('reservas:sala_lista'), {'q': 'audit'})
+        self.assertContains(r, 'value="audit"')
