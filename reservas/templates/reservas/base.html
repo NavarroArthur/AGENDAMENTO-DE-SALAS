@@ -13,10 +13,19 @@
             <a class="marca" href="{% url 'reservas:reserva_lista' %}">📅 Reserva de Salas</a>
             <nav class="menu">
                 <a href="{% url 'reservas:reserva_lista' %}">Agenda</a>
+                <a href="{% url 'reservas:dashboard' %}">Dashboard</a>
                 <a href="{% url 'reservas:sala_lista' %}">Salas</a>
                 <a href="{% url 'reservas:recurso_lista' %}">Recursos</a>
                 <a href="{% url 'reservas:reserva_nova' %}">+ Reserva</a>
                 <a class="destaque" href="{% url 'reservas:recorrencia_nova' %}">+ Recorrente</a>
+                <span class="usuario-logado">
+                    {{ request.user.get_username }} · {{ request.user.perfil.organizacao.nome }}
+                    ({{ request.user.perfil.get_papel_display }})
+                </span>
+                <form method="post" action="{% url 'logout' %}" class="form-sair">
+                    {% csrf_token %}
+                    <button type="submit" class="botao-sair">Sair</button>
+                </form>
             </nav>
         </div>
     </header>

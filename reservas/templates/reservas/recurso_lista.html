@@ -5,7 +5,7 @@
 {% block conteudo %}
 <div class="cabecalho-lista">
     <h1>Recursos</h1>
-    <a class="botao" href="{% url 'reservas:recurso_novo' %}">+ Novo recurso</a>
+    {% if is_admin %}<a class="botao" href="{% url 'reservas:recurso_novo' %}">+ Novo recurso</a>{% endif %}
 </div>
 
 <table class="tabela">
@@ -18,8 +18,10 @@
                 <td>{{ recurso.nome }}</td>
                 <td>{{ recurso.descricao|default:"—" }}</td>
                 <td class="acoes">
-                    <a href="{% url 'reservas:recurso_editar' recurso.pk %}">editar</a>
-                    <a class="perigo" href="{% url 'reservas:recurso_excluir' recurso.pk %}">excluir</a>
+                    {% if is_admin %}
+                        <a href="{% url 'reservas:recurso_editar' recurso.pk %}">editar</a>
+                        <a class="perigo" href="{% url 'reservas:recurso_excluir' recurso.pk %}">excluir</a>
+                    {% else %}—{% endif %}
                 </td>
             </tr>
         {% empty %}

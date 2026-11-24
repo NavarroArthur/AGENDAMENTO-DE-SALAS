@@ -12,6 +12,23 @@ class RecursoForm(forms.ModelForm):
             'descricao': forms.Textarea(attrs={'rows': 3}),
         }
 
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.organizacao = organizacao
+
+    def clean_nome(self):
+        nome = self.cleaned_data['nome']
+        if self.organizacao is not None:
+            duplicado = Recurso.objects.filter(
+                organizacao=self.organizacao,
+                nome__iexact=nome,
+            )
+            if self.instance.pk:
+                duplicado = duplicado.exclude(pk=self.instance.pk)
+            if duplicado.exists():
+                raise forms.ValidationError('Já existe um recurso com esse nome na organização.')
+        return nome
+
 
 class SalaForm(forms.ModelForm):
     class Meta:
@@ -20,6 +37,29 @@ class SalaForm(forms.ModelForm):
         widgets = {
             'recursos': forms.CheckboxSelectMultiple,
         }
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.organizacao = organizacao
+        if organizacao is None:
+            self.fields['recursos'].queryset = Recurso.objects.none()
+        else:
+            self.fields['recursos'].queryset = Recurso.objects.filter(
+                organizacao=organizacao
+            )
+
+    def clean_nome(self):
+        nome = self.cleaned_data['nome']
+        if self.organizacao is not None:
+            duplicada = Sala.objects.filter(
+                organizacao=self.organizacao,
+                nome__iexact=nome,
+            )
+            if self.instance.pk:
+                duplicada = duplicada.exclude(pk=self.instance.pk)
+            if duplicada.exists():
+                raise forms.ValidationError('Já existe uma sala com esse nome na organização.')
+        return nome
 
 
 class ReservaForm(forms.ModelForm):
@@ -36,6 +76,14 @@ class ReservaForm(forms.ModelForm):
             'observacoes': forms.Textarea(attrs={'rows': 3}),
         }
 
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.organizacao = organizacao
+        if organizacao is None:
+            self.fields['sala'].queryset = Sala.objects.none()
+        else:
+            self.fields['sala'].queryset = Sala.objects.filter(organizacao=organizacao)
+
     def clean(self):
         cleaned = super().clean()
         sala = cleaned.get('sala')
@@ -46,7 +94,17 @@ class ReservaForm(forms.ModelForm):
         if inicio and fim and inicio >= fim:
             self.add_error('hora_fim', 'A hora de fim deve ser depois da hora de início.')
         elif sala and data and inicio and fim:
-            conflito = reservas_em_conflito(sala, data, inicio, fim).first()
+            if self.organizacao and sala.organizacao_id != self.organizacao.pk:
+                self.add_error('sala', 'Escolha uma sala da sua organização.')
+                return cleaned
+            conflitos = reservas_em_conflito(
+                sala,
+                data,
+                inicio,
+                fim,
+                excluir_ids=[self.instance.pk] if self.instance.pk else None,
+            )
+            conflito = conflitos.first()
             if conflito:
                 raise forms.ValidationError(
                     f'Conflito de agenda: a sala "{sala}" já tem "{conflito.titulo}" '
@@ -62,7 +120,7 @@ class RecorrenciaForm(forms.Form):
     várias datas de uma vez.
     """
 
-    sala = forms.ModelChoiceField(queryset=Sala.objects.all(), label='Sala')
+    sala = forms.ModelChoiceField(queryset=Sala.objects.none(), label='Sala')
     titulo = forms.CharField(max_length=200, label='Título')
     responsavel = forms.CharField(max_length=120, label='Responsável')
     hora_inicio = forms.TimeField(
@@ -80,6 +138,14 @@ class RecorrenciaForm(forms.Form):
     observacoes = forms.CharField(
         required=False, widget=forms.Textarea(attrs={'rows': 3}), label='Observações')
 
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.organizacao = organizacao
+        self.fields['sala'].queryset = (
+            Sala.objects.filter(organizacao=organizacao)
+            if organizacao is not None else Sala.objects.none()
+        )
+
     def clean(self):
         cleaned = super().clean()
         inicio = cleaned.get('hora_inicio')
@@ -91,4 +157,17 @@ class RecorrenciaForm(forms.Form):
         df = cleaned.get('data_fim')
         if di and df and df < di:
             self.add_error('data_fim', 'A data de fim não pode ser antes da data de início.')
+        return cleaned
+
+
+class PeriodoForm(forms.Form):
+    inicio = forms.DateField(required=False, label='Início')
+    fim = forms.DateField(required=False, label='Fim')
+
+    def clean(self):
+        cleaned = super().clean()
+        inicio = cleaned.get('inicio')
+        fim = cleaned.get('fim')
+        if inicio and fim and fim < inicio:
+            self.add_error('fim', 'A data final não pode ser anterior à data inicial.')
         return cleaned

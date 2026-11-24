@@ -5,7 +5,7 @@
 {% block conteudo %}
 <div class="cabecalho-lista">
     <h1>Salas</h1>
-    <a class="botao" href="{% url 'reservas:sala_nova' %}">+ Nova sala</a>
+    {% if is_admin %}<a class="botao" href="{% url 'reservas:sala_nova' %}">+ Nova sala</a>{% endif %}
 </div>
 
 {# Feature 1 — busca e filtro. Os valores vêm de request.GET e reabastecem os campos. #}
@@ -46,8 +46,10 @@
                     {% empty %}—{% endfor %}
                 </td>
                 <td class="acoes">
-                    <a href="{% url 'reservas:sala_editar' sala.pk %}">editar</a>
-                    <a class="perigo" href="{% url 'reservas:sala_excluir' sala.pk %}">excluir</a>
+                    {% if is_admin %}
+                        <a href="{% url 'reservas:sala_editar' sala.pk %}">editar</a>
+                        <a class="perigo" href="{% url 'reservas:sala_excluir' sala.pk %}">excluir</a>
+                    {% else %}—{% endif %}
                 </td>
             </tr>
         {% empty %}

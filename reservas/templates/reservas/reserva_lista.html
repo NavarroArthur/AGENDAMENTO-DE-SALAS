@@ -24,9 +24,13 @@
                 <td>{{ r.titulo }}{% if r.recorrente %} <span class="tag">série</span>{% endif %}</td>
                 <td>{{ r.responsavel }}</td>
                 <td class="acoes">
-                    <a class="perigo" href="{% url 'reservas:reserva_excluir' r.pk %}">excluir</a>
+                    {% if is_admin or r.criado_por_id == user.id %}
+                        <a class="perigo" href="{% url 'reservas:reserva_excluir' r.pk %}">excluir</a>
+                    {% endif %}
                     {% if r.recorrente %}
-                        <a class="perigo" href="{% url 'reservas:recorrencia_excluir' r.recorrencia.pk %}">excluir série</a>
+                        {% if is_admin or r.recorrencia.criado_por_id == user.id %}
+                            <a class="perigo" href="{% url 'reservas:recorrencia_excluir' r.recorrencia.pk %}">excluir série</a>
+                        {% endif %}
                     {% endif %}
                 </td>
             </tr>

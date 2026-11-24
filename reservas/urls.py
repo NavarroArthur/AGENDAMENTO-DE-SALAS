@@ -7,6 +7,8 @@ app_name = 'reservas'
 urlpatterns = [
     # Agenda é a página inicial
     path('', views.reserva_lista, name='reserva_lista'),
+    path('dashboard/', views.dashboard, name='dashboard'),
+    path('relatorios/reservas.csv', views.exportar_csv, name='exportar_csv'),
 
     # Recursos
     path('recursos/', views.recurso_lista, name='recurso_lista'),

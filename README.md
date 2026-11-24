@@ -1,160 +1,129 @@
 # Reserva de Salas
 
-Sistema de reserva de salas em **Django puro** (MPA + templates), feito para a
-entrega **P1 (MVP funcional)** da disciplina *Laboratório de Programação Full Stack*.
+Aplicação web de agendamento de salas em Django puro, com templates server-side.
+Esta versão evolui o MVP da P1 para uma aplicação multi-organização, com login,
+papéis, API REST e dashboard.
 
-O núcleo do sistema são as **reservas recorrentes sem conflito de agenda**: você
-cria uma série (diária, semanal ou mensal) e o sistema só grava se **nenhuma**
-ocorrência colidir com uma reserva existente na mesma sala (regra *tudo ou nada*).
+## Funcionalidades
 
----
+- Salas e recursos separados por organização.
+- Busca de salas por nome, recurso e capacidade mínima.
+- Reservas avulsas e recorrentes, com bloqueio de conflitos de horário.
+- Login por sessão do Django e papéis de administrador e operador.
+- Isolamento de dados em todas as telas e endpoints por organização.
+- API REST autenticada para salas, recursos e reservas.
+- Dashboard com indicadores, período, gráficos e exportação CSV para administradores.
+- Django Admin com escopo por organização; superusuários gerenciam as organizações.
 
-## Entidades
+## Como rodar localmente
 
-| Entidade      | Papel |
-|---------------|-------|
-| **Recurso**   | Equipamento de sala (projetor, TV, ar-condicionado...). |
-| **Sala**      | Sala reservável; tem vários recursos (M2M). Dá para filtrar salas por recurso. |
-| **Reserva**   | Uma ocorrência: sala, título, responsável (texto), data, horário. Pode ser única ou pertencer a uma série. |
-| **Recorrência** | A regra da série (frequência, intervalo "a cada N", início e fim). Gera as Reservas. |
+Pré-requisitos: Python 3.11+.
 
-Cada ocorrência de uma série é uma `Reserva` ligada à `Recorrencia` por FK. Isso
-deixa a detecção de conflito **uniforme**: única ou recorrente, tudo vira `Reserva`
-e a checagem de choque é a mesma.
-
----
-
-## Como rodar
-
-Pré-requisito: Python 3.11+ instalado.
-
-```bash
-# 1. ambiente virtual
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-
-# 2. dependências
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+Copy-Item .env.example .env
+```
 
-# 3. variáveis de ambiente (sem isso ele já roda em SQLite)
-cp .env.example .env            # Windows: copy .env.example .env
+Edite `.env` e defina uma `SECRET_KEY` própria. Para desenvolvimento local,
+`DEBUG=1` e os hosts do exemplo permitem abrir o servidor em `127.0.0.1`.
 
-# 4. banco de dados
+```powershell
 python manage.py migrate
-
-# 5. usuário admin (para o /admin)
 python manage.py createsuperuser
-
-# 6. subir o servidor
+python manage.py configurar_organizacao --nome "Minha organização" --usuario admin
 python manage.py runserver
 ```
 
-Acesse:
+Acesse `http://127.0.0.1:8000/`. O comando `configurar_organizacao` reaproveita a
+organização padrão criada pela migração, para que os registros da P1 fiquem
+visíveis ao primeiro administrador. Em um banco novo, ele renomeia essa
+organização para o nome informado.
 
-- **Aplicação:** http://127.0.0.1:8000/
-- **Admin do Django:** http://127.0.0.1:8000/admin/
+Para adicionar usuários, entre em `/admin/`, crie a conta e depois um `Perfil`
+associando usuário, organização e papel. Só superusuários podem criar
+organizações e perfis pelo Admin. Membros usam as telas da aplicação em `/`.
 
-Sem `DB_NAME` no `.env`, o projeto usa **SQLite** automaticamente. Para PostgreSQL,
-preencha as variáveis `DB_*` no `.env` (precisa do `psycopg2-binary`, já no
-requirements) e rode `migrate` de novo.
+Sem `DB_NAME`, o projeto usa SQLite. Para PostgreSQL, preencha `DB_NAME`,
+`DB_USER`, `DB_PASSWORD`, `DB_HOST` e `DB_PORT` no ambiente. Antes de migrar um
+banco usado, faça um backup. A migração P2 atribui os dados legados à organização
+padrão e deixa `criado_por` vazio para as reservas antigas.
 
----
+## Papéis
 
-## Como funciona o núcleo
+| Ação | Administrador | Operador |
+|---|---:|---:|
+| Ver salas, recursos e agenda da organização | Sim | Sim |
+| Criar/editar/excluir salas e recursos | Sim | Não |
+| Criar reservas avulsas e recorrentes | Sim | Sim |
+| Excluir reservas/séries | Todas da organização | Apenas as que criou |
+| Ver cartões e ranking do dashboard | Sim | Sim |
+| Ver gráficos e exportar CSV | Sim | Não |
+| Escrever salas e recursos pela API | Sim | Não |
+| Criar reservas pela API | Sim | Sim |
 
-**Detecção de conflito** (`reservas/services.py` → `reservas_em_conflito`): duas
-reservas colidem quando são na **mesma sala**, no **mesmo dia**, e os horários se
-sobrepõem — `inicio_existente < fim_novo E inicio_novo < fim_existente`. Horários
-encostados (10–11 e 11–12) **não** conflitam.
+O campo `responsavel` continua sendo o nome informado para a reserva. `criado_por`
+registra a conta autenticada que a criou, sem perder o significado do campo atual.
 
-**Recorrência** (`gerar_datas`): expande a regra em datas.
+## API REST
 
-- *Diária* — a cada N dias.
-- *Semanal* — a cada N semanas.
-- *Mensal* — a cada N meses, ancorando no dia original (dia 31 vira o último dia
-  dos meses curtos, sem "escorregar" o dia).
-- Trava de segurança de 366 ocorrências.
+A API usa autenticação por sessão do Django e exige um perfil associado a uma
+organização. As rotas ficam sob `/api/` e não aceitam a organização no payload;
+ela é sempre obtida do perfil autenticado.
 
-**Tudo ou nada** (`recorrencia_nova` + `criar_serie`): gera todas as datas, checa
-conflito em cada uma; se **qualquer** uma colidir, **nada** é gravado e a tela
-lista exatamente as datas/horários em choque. Se estiver tudo livre, a série
-inteira é criada dentro de uma transação atômica.
+| Método e rota | Acesso |
+|---|---|
+| `GET /api/recursos/` | Lista os recursos da organização |
+| `POST /api/recursos/` | Administrador cria recurso |
+| `GET /api/salas/` | Lista salas e recursos da organização |
+| `POST /api/salas/` | Administrador cria sala |
+| `GET /api/reservas/` | Lista reservas da organização |
+| `POST /api/reservas/` | Membro cria reserva, validando conflito |
+| `GET /api/reservas/{id}/` | Detalha reserva da organização |
+| `PATCH /api/reservas/{id}/` | Administrador ou autor atualiza |
+| `DELETE /api/reservas/{id}/` | Administrador ou autor exclui |
+| `GET /api/series/` | Lista séries da organização |
+| `GET /api/dashboard/?inicio=AAAA-MM-DD&fim=AAAA-MM-DD` | Métricas da organização |
 
----
+As séries recorrentes são criadas pela tela web, que aplica a regra “tudo ou
+nada”. O endpoint de séries é somente leitura nesta versão.
 
-## Estrutura
+## Dashboard e relatórios
 
-```
-reserva-salas/
-├── manage.py
-├── requirements.txt
-├── .env.example
-├── reservasalas/            # configurações do projeto
-│   ├── settings.py          # dotenv + PostgreSQL/SQLite
-│   └── urls.py              # inclui reservas.urls
-└── reservas/                # app do domínio
-    ├── models.py            # Recurso, Sala, Recorrencia, Reserva
-    ├── services.py          # geração de datas + conflito (regra de negócio)
-    ├── forms.py             # ModelForm + form da série
-    ├── views.py             # views de função (CRUD + agenda)
-    ├── urls.py              # rotas com name
-    ├── admin.py             # 4 models registrados
-    ├── tests.py             # 19 testes do núcleo
-    ├── templates/reservas/  # base.html + páginas (herança de template)
-    └── static/reservas/     # estilo.css
-```
+O dashboard parte de uma única consulta filtrada por organização e período. Ele
+mostra total de reservas, avulsas e ocorrências recorrentes, ranking de salas,
+reservas por mês e por dia da semana. Administradores podem exportar o mesmo
+período em CSV. Valores textuais iniciados como fórmulas são neutralizados para
+evitar que planilhas executem conteúdo da reserva.
+
+Os gráficos usam Chart.js pela CDN jsDelivr; se o navegador estiver sem acesso à
+internet, os cartões e tabelas continuam disponíveis, mas os gráficos não serão
+desenhados.
+
+## Segurança e implantação
+
+- Todas as telas de negócio exigem login e perfil organizacional.
+- Consultas, IDs de URL, selects de formulários, API e métricas são escopados pela
+  organização autenticada.
+- CSRF continua ativo para formulários web; a autenticação de sessão do DRF também
+  exige CSRF em operações de escrita.
+- Em produção, use `DEBUG=0`, `SECRET_KEY` forte fora do repositório,
+  `ALLOWED_HOSTS` e `CSRF_TRUSTED_ORIGINS` explícitos, HTTPS e um banco de dados
+  com backup. Configure `SECURE_SSL_REDIRECT=1` e `SECURE_HSTS_SECONDS` apenas
+  quando o domínio já estiver servindo HTTPS.
+- `.env` e `db.sqlite3` são ignorados pelo Git. Não publique banco com dados reais.
 
 ## Testes
 
-```bash
+Os testes existentes cobrem geração de recorrências, conflitos, fluxo “tudo ou
+nada”, filtros de salas e validação de horários. Execute localmente com:
+
+```powershell
 python manage.py test
 ```
 
-19 testes cobrindo geração de datas (diária/semanal/mensal, intervalo, âncora do
-dia 31), detecção de conflito (sobreposição, encostado, outra sala, outro dia),
-e o fluxo *tudo ou nada* (série válida cria tudo; série com um conflito não grava
-nada).
+## Melhorias mapeadas da P1
 
----
-
-## O que está pronto no P1
-
-- CRUD completo de **Salas** e **Recursos** (front-end + Admin), com filtro de
-  salas por recurso.
-- **Reserva única** com bloqueio de conflito.
-- **Reserva recorrente** (diária/semanal/mensal) com validação *tudo ou nada*.
-- Agenda (página inicial) listando todas as reservas; exclusão de reserva avulsa
-  e de série inteira.
-- **Feature 1 — busca e filtro** na listagem de salas: busca por nome
-  (`icontains`) + filtros por recurso e capacidade mínima, combináveis.
-- **Feature 2 — validação customizada** no `ReservaForm`: término depois do
-  início (além do bloqueio de conflito de agenda).
-- Todos os models no Django Admin.
-
-> Versão enxuta: sem painel/dashboard, página de detalhe, filtros extras na
-> agenda nem campos/configs além do necessário — só o que o P1 pede.
-
-## Relatório P1 — Features obrigatórias
-
-**Feature 1 (busca e filtro)** foi aplicada à listagem de **Salas**. A busca é por
-**nome** (`nome__icontains`, ignora maiúsculas/minúsculas) e há filtros por
-**recurso** e por **capacidade mínima**, todos opcionais e combináveis (lidos de
-`request.GET` e encadeados com `.filter()`). Escolhi esses campos porque é assim
-que se procura uma sala na prática ("uma sala com projetor para 40 pessoas"); sem
-a feature, o usuário precisaria varrer a lista inteira.
-
-**Feature 2 (validação customizada)** está no `ReservaForm` (`ModelForm`), no
-método `clean()`: **o horário de término precisa ser depois do início**. Escolhi
-essa regra porque um horário invertido é logicamente impossível e passaria pela
-validação padrão do Django, quebrando a lógica de conflito. O mesmo `clean()`
-ainda bloqueia conflito de agenda.
-
-Sugestão de commits (um por feature): `feat: busca e filtro na listagem de salas`
-e `feat: validação de horário no ReservaForm`.
-
-## Roadmap sugerido para o P2
-
-- Autenticação e permissões (reserva vinculada ao usuário; atendente/gerente).
-- Editar reserva/série; página de detalhe; filtros na agenda; "pular ocorrências em conflito".
-- Camada DRF (`/api/`) expondo os mesmos models.
-- Testes de borda, segurança (CSRF já ativo), deploy.
+O arquivo [`MELHORIAS_P1.md`](MELHORIAS_P1.md) registra as fragilidades que esta
+evolução tratou e os pontos de verificação restantes para a entrega.

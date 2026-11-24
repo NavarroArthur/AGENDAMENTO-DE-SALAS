@@ -1,8 +1,10 @@
 from datetime import date, time
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from core.models import Organizacao, Perfil
 from .models import Recorrencia, Reserva, Recurso, Sala
 from .services import (
     checar_conflitos_serie,
@@ -10,6 +12,21 @@ from .services import (
     gerar_datas,
     reservas_em_conflito,
 )
+
+
+def _preparar_organizacao_e_login(testcase, nome='Organização de teste'):
+    organizacao = Organizacao.objects.create(nome=nome)
+    usuario = get_user_model().objects.create_user(
+        username='admin_teste',
+        password='senha-de-teste',
+    )
+    Perfil.objects.create(
+        usuario=usuario,
+        organizacao=organizacao,
+        papel=Perfil.ADMIN,
+    )
+    testcase.client.force_login(usuario)
+    return organizacao, usuario
 
 
 class GerarDatasTest(TestCase):
@@ -54,9 +71,11 @@ class GerarDatasTest(TestCase):
 
 class ConflitoTest(TestCase):
     def setUp(self):
-        self.sala = Sala.objects.create(nome='Auditório')
-        self.outra = Sala.objects.create(nome='Sala 2')
+        self.organizacao, _ = _preparar_organizacao_e_login(self)
+        self.sala = Sala.objects.create(nome='Auditório', organizacao=self.organizacao)
+        self.outra = Sala.objects.create(nome='Sala 2', organizacao=self.organizacao)
         Reserva.objects.create(
+            organizacao=self.organizacao,
             sala=self.sala, titulo='Existente', responsavel='Ana',
             data=date(2026, 3, 10), hora_inicio=time(10, 0), hora_fim=time(11, 0))
 
@@ -80,7 +99,8 @@ class ConflitoTest(TestCase):
 
 class SerieTest(TestCase):
     def setUp(self):
-        self.sala = Sala.objects.create(nome='Lab 1')
+        self.organizacao, _ = _preparar_organizacao_e_login(self)
+        self.sala = Sala.objects.create(nome='Lab 1', organizacao=self.organizacao)
 
     def test_serie_sem_conflito_cria_tudo(self):
         datas = gerar_datas('semanal', 1, date(2026, 5, 4), date(2026, 5, 25))
@@ -97,6 +117,7 @@ class SerieTest(TestCase):
     def test_serie_com_um_conflito_e_detectada(self):
         # Uma reserva única bloqueia uma das datas da série
         Reserva.objects.create(
+            organizacao=self.organizacao,
             sala=self.sala, titulo='Bloqueio', responsavel='X',
             data=date(2026, 5, 11), hora_inicio=time(14, 30), hora_fim=time(15, 30))
         datas = gerar_datas('semanal', 1, date(2026, 5, 4), date(2026, 5, 25))
@@ -107,7 +128,8 @@ class SerieTest(TestCase):
 
 class ViewReservaTest(TestCase):
     def setUp(self):
-        self.sala = Sala.objects.create(nome='Sala A')
+        self.organizacao, self.usuario = _preparar_organizacao_e_login(self)
+        self.sala = Sala.objects.create(nome='Sala A', organizacao=self.organizacao)
 
     def test_criar_reserva_unica(self):
         resp = self.client.post(reverse('reservas:reserva_nova'), {
@@ -120,6 +142,7 @@ class ViewReservaTest(TestCase):
 
     def test_reserva_conflitante_e_rejeitada(self):
         Reserva.objects.create(
+            organizacao=self.organizacao,
             sala=self.sala, titulo='Ocupada', responsavel='Y',
             data=date(2026, 6, 1), hora_inicio=time(9, 0), hora_fim=time(10, 0))
         resp = self.client.post(reverse('reservas:reserva_nova'), {
@@ -134,7 +157,8 @@ class ViewReservaTest(TestCase):
 
 class ViewRecorrenciaTest(TestCase):
     def setUp(self):
-        self.sala = Sala.objects.create(nome='Sala B')
+        self.organizacao, self.usuario = _preparar_organizacao_e_login(self)
+        self.sala = Sala.objects.create(nome='Sala B', organizacao=self.organizacao)
 
     def _payload(self, **overrides):
         dados = {
@@ -156,6 +180,7 @@ class ViewRecorrenciaTest(TestCase):
     def test_serie_com_conflito_nao_salva_nada(self):
         # Bloqueia a 2ª ocorrência (13/07)
         Reserva.objects.create(
+            organizacao=self.organizacao,
             sala=self.sala, titulo='Bloqueio', responsavel='Z',
             data=date(2026, 7, 13), hora_inicio=time(8, 30), hora_fim=time(9, 30))
         antes = Reserva.objects.count()
@@ -178,11 +203,16 @@ class ViewRecorrenciaTest(TestCase):
 # --------------------------------------------------------------------------- #
 class BuscaFiltroSalasTest(TestCase):
     def setUp(self):
-        self.projetor = Recurso.objects.create(nome='Projetor')
-        self.tv = Recurso.objects.create(nome='TV')
-        self.auditorio = Sala.objects.create(nome='Auditório Central', capacidade=100)
+        self.organizacao, _ = _preparar_organizacao_e_login(self)
+        self.projetor = Recurso.objects.create(nome='Projetor', organizacao=self.organizacao)
+        self.tv = Recurso.objects.create(nome='TV', organizacao=self.organizacao)
+        self.auditorio = Sala.objects.create(
+            nome='Auditório Central', capacidade=100, organizacao=self.organizacao
+        )
         self.auditorio.recursos.add(self.projetor)
-        self.pequena = Sala.objects.create(nome='Sala Pequena', capacidade=10)
+        self.pequena = Sala.objects.create(
+            nome='Sala Pequena', capacidade=10, organizacao=self.organizacao
+        )
         self.pequena.recursos.add(self.tv)
 
     def test_busca_por_nome_icontains(self):
@@ -222,7 +252,8 @@ class BuscaFiltroSalasTest(TestCase):
 # --------------------------------------------------------------------------- #
 class ValidacaoHorarioReservaTest(TestCase):
     def setUp(self):
-        self.sala = Sala.objects.create(nome='Sala X')
+        self.organizacao, _ = _preparar_organizacao_e_login(self)
+        self.sala = Sala.objects.create(nome='Sala X', organizacao=self.organizacao)
 
     def _dados(self, inicio, fim):
         return {'sala': self.sala.id, 'titulo': 'Reunião', 'responsavel': 'Ana',
@@ -231,11 +262,11 @@ class ValidacaoHorarioReservaTest(TestCase):
 
     def test_fim_antes_do_inicio_e_rejeitado(self):
         from .forms import ReservaForm
-        form = ReservaForm(data=self._dados('11:00', '10:00'))
+        form = ReservaForm(data=self._dados('11:00', '10:00'), organizacao=self.organizacao)
         self.assertFalse(form.is_valid())
         self.assertIn('hora_fim', form.errors)
 
     def test_horario_valido_passa(self):
         from .forms import ReservaForm
-        form = ReservaForm(data=self._dados('10:00', '11:00'))
+        form = ReservaForm(data=self._dados('10:00', '11:00'), organizacao=self.organizacao)
         self.assertTrue(form.is_valid())

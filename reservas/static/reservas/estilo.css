@@ -30,6 +30,9 @@ body {
 .menu a { color: #f0e6e6; text-decoration: none; font-size: .95rem; }
 .menu a:hover { color: #fff; text-decoration: underline; }
 .menu a.destaque { background: var(--dourado); color: #3a2400; padding: 4px 10px; border-radius: 6px; font-weight: 600; }
+.usuario-logado { color: #f0e6e6; font-size: .82rem; align-self: center; }
+.form-sair { display: inline; margin: 0; }
+.botao-sair { background: transparent; border: 1px solid #d5c3c3; color: #fff; border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; }
 
 .conteudo { padding: 24px 16px 48px; }
 
@@ -49,6 +52,20 @@ h2 { color: var(--vinho-claro); margin-top: 32px; }
 .card { background: #fff; border: 1px solid var(--borda); border-radius: 10px; padding: 18px; text-align: center; }
 .card .numero { display: block; font-size: 2rem; font-weight: 700; color: var(--vinho); }
 .card .rotulo { color: var(--cinza); font-size: .9rem; }
+.painel-dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; align-items: start; }
+.bloco-dashboard { background: #fff; border: 1px solid var(--borda); border-radius: 10px; padding: 16px; min-width: 0; }
+.bloco-dashboard h2 { margin: 0 0 14px; font-size: 1.1rem; }
+.grafico { min-height: 260px; position: relative; }
+.bloco-vazio { padding: 64px 10px; text-align: center; }
+.filtros-periodo label { display: grid; gap: 4px; font-weight: 600; }
+.filtros-periodo input { min-height: 36px; }
+.erros-periodo { color: var(--vermelho); margin: 8px 0 16px; }
+
+/* Login */
+.pagina-login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.cartao-login { width: 100%; max-width: 440px; background: #fff; border: 1px solid var(--borda); border-radius: 12px; padding: 28px; box-shadow: 0 8px 30px rgba(0, 0, 0, .08); }
+.cartao-login h1 { margin-bottom: 4px; }
+.formulario-login { max-width: none; border: 0; padding: 10px 0 0; }
 
 /* Tabelas */
 .tabela { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--borda); border-radius: 8px; overflow: hidden; }
@@ -80,7 +97,7 @@ h2 { color: var(--vinho-claro); margin-top: 32px; }
 .formulario p { margin: 0 0 14px; }
 .formulario label { display: block; font-weight: 600; margin-bottom: 4px; color: #333; font-size: .93rem; }
 .formulario input[type=text], .formulario input[type=number], .formulario input[type=date],
-.formulario input[type=time], .formulario select, .formulario textarea {
+.formulario input[type=time], .formulario input[type=password], .formulario select, .formulario textarea {
     width: 100%; padding: 8px 10px; border: 1px solid #c9c3bb; border-radius: 6px; font-size: .95rem; font-family: inherit;
 }
 .formulario ul { margin: 4px 0; padding-left: 18px; }
@@ -104,4 +121,6 @@ h2 { color: var(--vinho-claro); margin-top: 32px; }
 @media (max-width: 600px) {
     .ficha { grid-template-columns: 1fr; }
     .tabela { display: block; overflow-x: auto; }
+    .painel-dashboard { grid-template-columns: 1fr; }
+    .usuario-logado { width: 100%; }
 }
